@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EV Insights | Electric Vehicle Market Performance</title>
+  <meta name="description" content="Interactive analytics on EV manufacturers, customer ratings and battery capacity, built from a Tableau Public dashboard and story.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+  <!-- Loaded in <head> (no defer) so the saved theme is applied before first paint -->
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+</head>
+<body>
+
+{# Reusable container for an embedded Tableau view (dashboard or story) #}
+{% macro viz_shell(id, src, label) %}
+<div class="viz-shell glass" id="{{ id }}Shell" data-viz="{{ id }}" data-src="{{ src }}" data-state="idle">
+  <div class="skeleton" role="status">
+    <div class="spinner"></div>
+    <p>Loading the {{ label }}...</p>
+  </div>
+  <div class="viz-error" role="alert">
+    <i data-lucide="triangle-alert"></i>
+    <h3>The {{ label }} didn't load</h3>
+    <p>Check your connection, and make sure the Tableau Public link in app.py is published and public.</p>
+    <div class="row">
+      <button class="btn primary sm" data-action="retry"><i data-lucide="refresh-cw"></i> Try again</button>
+      <a class="btn ghost sm" href="{{ src }}" target="_blank" rel="noopener">Open on Tableau Public</a>
+    </div>
+  </div>
+  <div class="viz-bar"><span class="dots"><i></i><i></i><i></i></span><span class="viz-url">public.tableau.com</span></div>
+  <div class="viz-host"></div>
+  <button class="viz-exit" data-action="exit-fullscreen"><i data-lucide="minimize"></i> Exit fullscreen</button>
+</div>
+{% endmacro %}
+
+<header class="nav" id="nav">
+  <div class="container nav-inner">
+    <a href="#overview" class="brand"><span class="brand-mark"><i data-lucide="zap"></i></span>EV INSIGHTS</a>
+    <nav class="nav-links" id="navLinks" aria-label="Primary">
+      <a href="#overview" class="active">Overview</a>
+      <a href="#about">About</a>
+      <a href="#dashboard">Dashboard</a>
+      <a href="#story">Story</a>
+      <a href="#insights">Insights</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="btn primary sm nav-cta" href="#dashboard">Explore dashboard</a>
+      <button class="icon-btn" id="themeToggle" aria-label="Switch between dark and light theme">
+        <i data-lucide="sun" class="i-sun"></i><i data-lucide="moon" class="i-moon"></i>
+      </button>
+      <button class="icon-btn menu-btn" id="menuBtn" aria-label="Open menu" aria-expanded="false"><i data-lucide="menu"></i></button>
+    </div>
+  </div>
+  <div class="progress" id="progress"></div>
+</header>
+
+<main>
+  <!-- A. Hero + KPIs -->
+  <section class="hero" id="overview">
+    <div class="hero-bg" aria-hidden="true">
+      <span class="orb o1"></span><span class="orb o2"></span><span class="grid"></span>
+      <span class="streak s1"></span><span class="streak s2"></span><span class="streak s3"></span>
+    </div>
+    <div class="container hero-inner">
+      <span class="pill"><span class="dot"></span> Electric vehicle market analytics</span>
+      <h1>Transforming Electric Mobility Data into <span class="grad">Strategic Insights.</span></h1>
+      <p class="typed-line">Explore <span id="typed" data-words='["manufacturers","battery capacity","customer ratings","sales trends","charging performance"]'></span><i class="caret"></i></p>
+      <p class="lead">This platform analyzes EV market performance across manufacturers, customer ratings and battery capabilities, so you can see which brands lead, which ones satisfy drivers and how much range the market delivers.</p>
+      <div class="cta">
+        <a class="btn primary" href="#dashboard">Explore dashboard</a>
+        <a class="btn ghost" href="#insights">View insights</a>
+      </div>
+    </div>
+
+    <div class="container preview reveal">
+      <div class="preview-card glass">
+        <div class="viz-bar"><span class="dots"><i></i><i></i><i></i></span><span class="viz-url">Data snapshot from 100,000 vehicles</span></div>
+        <div class="preview-grid">
+          <div>
+            <h4>Annual sales by model year (million units)</h4>
+            <div class="bars">
+              {% for year, val in sales_by_year %}
+              <div class="bar" style="--h:{{ (val / 90 * 100)|round(1) }}%; transition-delay:{{ loop.index0 * 70 }}ms"><span>{{ val }}</span><em>{{ year }}</em></div>
+              {% endfor %}
+            </div>
+          </div>
+          <div>
+            <h4>Battery technology share</h4>
+            <div class="donut-wrap">
+              <div class="donut" style="background:{{ donut }}"></div>
+              <ul class="legend">
+                {% for name, pct, color in battery_share %}<li><i style="background:{{ color }}"></i>{{ name }} <b>{{ pct }}%</b></li>{% endfor %}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="container kpi-grid">
+      {% for k in kpis %}
+      <article class="kpi glass reveal">
+        <div class="kpi-icon"><i data-lucide="{{ k.icon }}"></i></div>
+        <p class="kpi-label">{{ k.label }}</p>
+        <p class="kpi-value">
+          {% if k.value is none %}<span>--</span>{% else %}<span data-count="{{ k.value }}" data-decimals="{{ k.decimals }}">0</span>{% endif %}
+          {% if k.unit %}<small>{{ k.unit }}</small>{% endif %}
+        </p>
+        {% if k.value is none %}<span class="badge">Placeholder: set in app.py</span>{% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <div class="ticker" aria-hidden="true">
+    <div class="ticker-track">
+      {% for n in range(2) %}{% for t in ticker %}<span>{{ t }}</span>{% endfor %}{% endfor %}
+    </div>
+  </div>
+
+  <!-- About: illustrations and feature cards -->
+  <section class="section" id="about">
+    <div class="container">
+      <div class="about-grid">
+        <div class="about-media glass">
+          <img src="{{ url_for('static', filename='img/ev-car.svg') }}" alt="Illustration of an electric car charging" width="600" height="300">
+        </div>
+        <div class="about-copy">
+          <h2>Insights behind the EV market</h2>
+          <p class="muted">The EV market is large, crowded and technically diverse. This project turns 100,000 vehicle records into clear comparisons of manufacturers, battery technology, customer ratings and sales.</p>
+          <div class="feat-grid">
+            {% for icon, title, text in features %}
+            <article class="feat glass reveal">
+              <div class="ins-icon"><i data-lucide="{{ icon }}"></i></div>
+              <h3>{{ title }}</h3><p>{{ text }}</p>
+            </article>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="spot-grid">
+        {% for img, title, text in spotlights %}
+        <article class="media-card glass reveal">
+          <img src="{{ url_for('static', filename='img/' ~ img) }}" alt="" loading="lazy">
+          <div><h3>{{ title }}</h3><p>{{ text }}</p></div>
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- B. Tableau dashboard -->
+  <section class="section" id="dashboard">
+    <div class="container wide">
+      <div class="section-head">
+        <div>
+          <h2>Interactive dashboard</h2>
+          <p>Filter, hover and click inside the charts to compare manufacturers, ratings and battery capacity.</p>
+        </div>
+        <div class="row">
+          <button class="btn ghost sm" data-action="fullscreen" data-target="dashboard"><i data-lucide="maximize"></i> Fullscreen</button>
+          <a class="btn ghost sm" href="{{ dashboard_url }}" target="_blank" rel="noopener"><i data-lucide="external-link"></i> Open on Tableau Public</a>
+        </div>
+      </div>
+      {{ viz_shell('dashboard', dashboard_url, 'dashboard') }}
+    </div>
+  </section>
+
+  <!-- C. Tableau story -->
+  <section class="section alt" id="story">
+    <div class="container wide">
+      <div class="section-head">
+        <div>
+          <h2>Data story</h2>
+          <p>Follow the narrative step by step. Use the arrows and captions inside the story to move between story points.</p>
+        </div>
+        <div class="row">
+          <button class="btn ghost sm" data-action="fullscreen" data-target="story"><i data-lucide="maximize"></i> Fullscreen</button>
+          <a class="btn ghost sm" href="{{ story_url }}" target="_blank" rel="noopener"><i data-lucide="external-link"></i> Open on Tableau Public</a>
+        </div>
+      </div>
+      {{ viz_shell('story', story_url, 'story') }}
+    </div>
+  </section>
+
+  <!-- D. Insights -->
+  <section class="section" id="insights">
+    <div class="container">
+      <div class="section-head">
+        <div>
+          <h2>Insights and data summary</h2>
+          <p>Findings calculated from the 100,000-vehicle dataset behind the dashboard.</p>
+        </div>
+      </div>
+      <div class="chips" role="tablist" aria-label="Filter insights">
+        <button class="chip active" role="tab" aria-selected="true" data-filter="all">All</button>
+        {% for key, name in categories.items() %}
+        <button class="chip" role="tab" aria-selected="false" data-filter="{{ key }}">{{ name }}</button>
+        {% endfor %}
+      </div>
+      <div class="insight-grid">
+        {% for i in insights %}
+        <article class="insight glass reveal" data-cat="{{ i.cat }}">
+          {% set icons = {'market': 'trending-up', 'manufacturers': 'factory', 'battery': 'battery-charging', 'ratings': 'star'} %}
+          <div class="ins-icon"><i data-lucide="{{ icons[i.cat] }}"></i></div>
+          <span class="tag">{{ categories[i.cat] }}</span>
+          <h3>{{ i.title }}</h3>
+          {% if i.text %}
+            <p>{{ i.text }}</p>
+          {% else %}
+            <p class="muted">Add what you observe in the dashboard for this topic in the INSIGHTS list in app.py.</p>
+            <span class="badge">Placeholder</span>
+          {% endif %}
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- E. Quick actions -->
+<aside class="fab" aria-label="Quick actions">
+  <button data-action="fullscreen" data-target="dashboard" data-tip="Fullscreen dashboard" aria-label="Fullscreen dashboard"><i data-lucide="maximize"></i></button>
+  <button data-action="copy" data-tip="Copy website link" aria-label="Copy website link"><i data-lucide="link"></i></button>
+  <a href="{{ url_for('download_summary') }}" data-action="download" data-tip="Download project summary" aria-label="Download project summary"><i data-lucide="download"></i></a>
+  <button data-action="top" data-tip="Back to top" aria-label="Back to top"><i data-lucide="arrow-up"></i></button>
+</aside>
+
+<footer class="footer">
+  <div class="container foot-grid">
+    <div>
+      <p class="brand"><span class="brand-mark"><i data-lucide="zap"></i></span>EV INSIGHTS</p>
+      <p class="muted">Electric Vehicle Market Performance &amp; Insights: an interactive look at manufacturers, customer ratings and battery capacity.</p>
+    </div>
+    <div>
+      <p class="foot-title">Built with</p>
+      <div class="stack"><span>Python Flask</span><span>HTML5 / CSS3</span><span>Vanilla JavaScript</span><span>Tableau Public</span></div>
+    </div>
+  </div>
+  <div class="container foot-bottom">
+    <span>Developed by {{ developer }}</span>
+    <span>&copy; {{ year }} EV Insights. All rights reserved.</span>
+  </div>
+</footer>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="{{ url_for('static', filename='js/tableau.js') }}"></script>
+</body>
+</html>
